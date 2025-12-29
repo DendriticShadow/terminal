@@ -4,23 +4,42 @@
   import { theme } from '../stores/theme';
   import { commands } from '../utils/commands';
   import { track } from '../utils/tracking';
+  import { bannerAnimationComplete } from '../stores/bannerAnimation';
 
   let command = '';
   let historyIndex = -1;
 
   let input: HTMLInputElement;
 
-  onMount(() => {
-    input.focus();
-
+  onMount(async () => {
     if ($history.length === 0) {
-      const command = commands['banner'] as () => string;
+      const bannerCommand = commands['banner'] as () => string;
 
-      if (command) {
-        const output = command();
+      if (bannerCommand) {
+        const bannerText = bannerCommand();
+        const lines = bannerText.split('\n');
 
-        $history = [...$history, { command: 'banner', outputs: [output] }];
+        // Animate banner line by line
+        let currentOutput = '';
+        for (let i = 0; i < lines.length; i++) {
+          currentOutput += (i > 0 ? '\n' : '') + lines[i];
+          $history = [{ command: 'banner', outputs: [currentOutput] }];
+
+          // Delay between lines (adjust speed here: lower = faster)
+          await new Promise(resolve => setTimeout(resolve, 95));
+        }
+
+        // Mark animation as complete
+        bannerAnimationComplete.set(true);
+
+        // Focus input after animation
+        await new Promise(resolve => setTimeout(resolve, 100));
+        input.focus();
       }
+    } else {
+      // If history exists (returning user), skip animation
+      bannerAnimationComplete.set(true);
+      input.focus();
     }
   });
 
@@ -41,7 +60,8 @@
       if (commandFunction) {
         const output = await commandFunction(args);
 
-        if (commandName !== 'clear') {
+        // Only add to history if command didn't already handle it (output !== null)
+        if (commandName !== 'clear' && output !== null) {
           $history = [...$history, { command, outputs: [output] }];
         }
       } else {

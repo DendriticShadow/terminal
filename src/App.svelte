@@ -3,6 +3,7 @@
   import Input from './components/Input.svelte';
   import History from './components/History.svelte';
   import { theme } from './stores/theme';
+  import { bannerAnimationComplete } from './stores/bannerAnimation';
 </script>
 
 <svelte:head>
@@ -22,7 +23,7 @@
 >
   <History />
 
-  <div class="flex flex-col md:flex-row">
+  <div class="flex flex-col md:flex-row" style={$bannerAnimationComplete ? '' : 'visibility: hidden;'}>
     <Ps1 />
 
     <Input />
