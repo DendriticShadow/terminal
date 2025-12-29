@@ -1,90 +1,71 @@
 import packageJson from "../../package.json";
-import themes from "../../themes.json";
+import { get } from "svelte/store";
 import { history } from "../stores/history";
-import { theme } from "../stores/theme";
+import type { Command } from "../interfaces/command";
 import { todoManager } from "./todo";
-
-const hostname = window.location.hostname;
 
 export const commands: Record<string, (args: string[]) => Promise<string> | string> = {
   help: () => {
-    const categories = {
-      System: ["help", "clear", "date", "exit"],
-      Productivity: ["todo", "weather"],
-      Customization: ["theme", "banner"],
-      Network: ["curl", "hostname", "whoami"],
-      Contact: ["email", "repo", "donate"],
-      Fun: ["echo", "sudo", "vi", "vim", "emacs"],
-    };
+    const commands = [
+      "help",
+      "whoami",
+      "date",
+      "todo",
+      "weather",
+      "history",
+      "sudo",
+      "email",
+      "repo",
+      "clear",
+      "banner",
+    ];
 
-    let output = "Available commands:\n\n";
+    return "Available commands:\n\n" + commands.join("\n");
+  },
+  whoami: async () => {
+    const text = `  Hey, I'm Will! 🤗
 
-    for (const [category, cmds] of Object.entries(categories)) {
-      output += `${category}:\n`;
-      output += cmds.map((cmd) => `  ${cmd}`).join("\n");
-      output += "\n\n";
+  I've worked in IT since I was 18, specializing in DevSecOps for the past 6 years.
+  I love building cloud infrastructure and solving (mostly creating) complex engineering problems.
+
+  Dallas-based with a beautiful family.
+  When I'm not learning a new skill, I'm lifting weights, gaming, watching movies, or spending time with the fam.`;
+
+    // Add initial entry to history
+    const currentHistory = get(history);
+    history.set([...currentHistory, { command: 'whoami', outputs: [''] }]);
+
+    // Animate character by character
+    let output = '';
+    const chars = text.split('');
+
+    for (let i = 0; i < chars.length; i++) {
+      output += chars[i];
+
+      // Update the last history entry with progressive output
+      const historyValue = get(history);
+      const lastEntry = historyValue[historyValue.length - 1];
+      lastEntry.outputs = [output];
+      history.set([...historyValue.slice(0, -1), { ...lastEntry }]);
+
+      // Delay between characters (adjust speed: lower = faster)
+      await new Promise(resolve => setTimeout(resolve, 20));
     }
 
-    output +=
-      'Type "[command] help" or "[command]" without args for more info.';
-
-    return output;
+    return null; // Return null to prevent duplicate entry
   },
-  hostname: () => hostname,
-  whoami: () => "guest",
   date: () => new Date().toLocaleString(),
-  vi: () => `why use vi? try 'emacs'`,
-  vim: () => `why use vim? try 'emacs'`,
-  emacs: () => `why use emacs? try 'vim'`,
-  echo: (args: string[]) => args.join(" "),
   sudo: (args: string[]) => {
     window.open("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 
     return `Permission denied: unable to run the command '${args[0]}' as root.`;
   },
-  theme: (args: string[]) => {
-    const usage = `Usage: theme [args].
-    [args]:
-      ls: list all available themes
-      set: set theme to [theme]
-
-    [Examples]:
-      theme ls
-      theme set gruvboxdark
-    `;
-    if (args.length === 0) {
-      return usage;
+  history: () => {
+    const hist = get(history);
+    if (hist.length === 0) {
+      return "No command history.";
     }
-
-    switch (args[0]) {
-      case "ls": {
-        let result = themes.map((t) => t.name.toLowerCase()).join(", ");
-        result += `You can preview all these themes here: ${packageJson.repository.url}/tree/master/docs/themes`;
-
-        return result;
-      }
-
-      case "set": {
-        if (args.length !== 2) {
-          return usage;
-        }
-
-        const selectedTheme = args[1];
-        const t = themes.find((t) => t.name.toLowerCase() === selectedTheme);
-
-        if (!t) {
-          return `Theme '${selectedTheme}' not found. Try 'theme ls' to see all available themes.`;
-        }
-
-        theme.set(t);
-
-        return `Theme set to ${selectedTheme}`;
-      }
-
-      default: {
-        return usage;
-      }
-    }
+    return hist.map((cmd: Command, i: number) => `${i + 1}  ${cmd.command}`).join("\n");
   },
   repo: () => {
     window.open(packageJson.repository.url, "_blank");
@@ -101,11 +82,6 @@ export const commands: Record<string, (args: string[]) => Promise<string> | stri
 
     return `Opening mailto:${packageJson.author.email}...`;
   },
-  donate: () => {
-    window.open(packageJson.funding.url, "_blank");
-
-    return "Opening donation url...";
-  },
   weather: async (args: string[]) => {
     const city = args.join("+");
 
@@ -117,32 +93,13 @@ export const commands: Record<string, (args: string[]) => Promise<string> | stri
 
     return weather.text();
   },
-  exit: () => {
-    return "Please close the tab to exit.";
-  },
-  curl: async (args: string[]) => {
-    if (args.length === 0) {
-      return "curl: no URL provided";
-    }
-
-    const url = args[0];
-
-    try {
-      const response = await fetch(url);
-      const data = await response.text();
-
-      return data;
-    } catch (error) {
-      return `curl: could not fetch URL ${url}. Details: ${error}`;
-    }
-  },
   banner: () => `
-███╗   ███╗██╗  ██╗████████╗████████╗███████╗██████╗
-████╗ ████║██║  ██║╚══██╔══╝╚══██╔══╝╚════██║╚════██╗
-██╔████╔██║███████║   ██║      ██║       ██╔╝ █████╔╝
-██║╚██╔╝██║╚════██║   ██║      ██║      ██╔╝ ██╔═══╝
-██║ ╚═╝ ██║     ██║   ██║      ██║      ██║  ███████╗
-╚═╝     ╚═╝     ╚═╝   ╚═╝      ╚═╝      ╚═╝  ╚══════╝ v${packageJson.version}
+██╗  ██╗███████╗██╗      ██████╗        ██╗ 
+██║  ██║██╔════╝██║     ██╔═══██╗    ██╗╚██╗
+███████║█████╗  ██║     ██║   ██║    ╚═╝ ██║
+██╔══██║██╔══╝  ██║     ██║   ██║    ██╗ ██║
+██║  ██║███████╗███████╗╚██████╔╝    ╚═╝██╔╝
+╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝        ╚═╝
 
 Type 'help' to see list of available commands.
 `,
